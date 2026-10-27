@@ -1,0 +1,349 @@
+/* ===========================================================================
+   LoL Build Finder — tema dark inspirado em League of Legends
+   =========================================================================== */
+
+/* Variáveis de cor (paleta oficial-ish do LoL) */
+:root {
+  --bg: #0a0e1a;          /* fundo principal (azul muito escuro) */
+  --card: #0d1428;        /* fundo de cards */
+  --border: #1e3a5f;      /* bordas azul escuro */
+  --gold: #c89b3c;        /* dourado LoL (destaque) */
+  --gold-bright: #f0e6d2; /* dourado claro para hover */
+  --text: #e8d5a3;        /* texto principal bege dourado */
+  --text-dim: #8899aa;    /* texto secundário */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- Cabeçalho */
+.header {
+  text-align: center;
+  padding: 28px 16px;
+  background: linear-gradient(180deg, #0d1428 0%, #0a0e1a 100%);
+  border-bottom: 2px solid var(--gold);
+}
+
+.logo {
+  font-family: 'Cinzel', serif;
+  font-weight: 800;
+  font-size: clamp(1.8rem, 5vw, 3rem);
+  color: var(--gold);
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(200, 155, 60, 0.3);
+}
+
+.subtitle {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-top: 6px;
+  letter-spacing: 1px;
+}
+
+/* ---------------------------------------------------------------- Container */
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+/* ------------------------------------------------------------ Área de busca */
+.search {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1 1 260px;
+}
+
+.search-input,
+.lane-select {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input::placeholder {
+  color: var(--text-dim);
+}
+
+/* Borda dourada ao focar */
+.search-input:focus,
+.lane-select:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(200, 155, 60, 0.25);
+}
+
+.lane-select {
+  flex: 0 0 auto;
+  width: auto;
+  cursor: pointer;
+}
+
+/* Botão de busca */
+.search-btn {
+  flex: 0 0 auto;
+  padding: 12px 24px;
+  background: var(--gold);
+  border: none;
+  border-radius: 6px;
+  color: #0a0e1a;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+
+.search-btn:hover {
+  background: var(--gold-bright);
+  box-shadow: 0 0 16px rgba(200, 155, 60, 0.5);
+}
+
+/* ------------------------------------------------------------ Autocomplete */
+.autocomplete {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 20;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.autocomplete-item:hover {
+  background: rgba(200, 155, 60, 0.12);
+}
+
+.autocomplete-item img {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* ------------------------------------------------- Estados loading / erro */
+.loading {
+  text-align: center;
+  padding: 32px;
+  color: var(--gold);
+  font-size: 1.1rem;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.error {
+  margin-top: 24px;
+  padding: 16px;
+  background: rgba(200, 60, 60, 0.12);
+  border: 1px solid #a33;
+  border-radius: 6px;
+  color: #ffb3b3;
+  text-align: center;
+}
+
+/* --------------------------------------------------------- Área de resultado */
+.result {
+  margin-top: 24px;
+}
+
+.result-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+
+/* Splash art como fundo, com gradiente por cima para legibilidade */
+.result-hero {
+  position: relative;
+  padding: 28px 20px;
+  background-size: cover;
+  background-position: center 20%;
+}
+
+.result-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 14, 26, 0.55) 0%,
+    rgba(10, 14, 26, 0.85) 70%,
+    var(--card) 100%
+  );
+}
+
+.hero-content {
+  position: relative; /* fica acima do gradiente */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero-content .champ-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  border: 2px solid var(--gold);
+}
+
+.champ-name {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  font-weight: 700;
+  color: var(--gold-bright);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* Badges de estatísticas */
+.stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+}
+
+.badge.tier { color: var(--gold); border-color: var(--gold); }
+.badge.wr { color: #7ee787; border-color: #2e7d32; }
+.badge.pr { color: #79c0ff; border-color: #1f6feb; }
+.badge.br { color: #ff9b9b; border-color: #a33; }
+.badge.lane { color: var(--text); border-color: var(--border); text-transform: capitalize; }
+
+/* Separador entre runa primária e secundária */
+.rune-sep {
+  color: var(--text-dim);
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 2px;
+}
+
+/* Corpo do resultado (itens e runas) */
+.result-body {
+  padding: 20px;
+}
+
+.section-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.1rem;
+  color: var(--gold);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Grid de itens */
+.items-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.item {
+  width: 72px;
+  text-align: center;
+}
+
+.item-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  border: 2px solid var(--gold);
+  background: #000;
+  object-fit: cover;
+}
+
+.item-name {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  line-height: 1.2;
+}
+
+/* Bota recomendada — destaque sutil */
+.boots-block { margin-bottom: 24px; }
+
+/* Seção de runas com ícones circulares menores */
+.runes-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.rune-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid var(--gold);
+  background: #000;
+  object-fit: cover;
+}
+
+.runes-raw {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  word-break: break-word;
+}
+
+/* Utilitário */
+.hidden { display: none !important; }
+
+/* --------------------------------------------------------------- Responsivo */
+@media (max-width: 560px) {
+  .search { flex-direction: column; }
+  .lane-select, .search-btn { width: 100%; }
+}

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LoL Build Finder</title>
+  <!-- Fonte Cinzel para títulos (estilo medieval, parecido com a fonte do LoL) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Cabeçalho -->
+  <header class="header">
+    <h1 class="logo">LoL Build Finder</h1>
+    <p class="subtitle">Patch atual · Ranked Solo/Duo</p>
+  </header>
+
+  <!-- Área de busca -->
+  <main class="container">
+    <section class="search">
+      <!-- Wrapper do input + autocomplete (posição relativa para posicionar as sugestões) -->
+      <div class="search-input-wrap">
+        <input
+          type="text"
+          id="champion-input"
+          class="search-input"
+          placeholder="Digite o nome do campeão"
+          autocomplete="off"
+        />
+        <!-- Div flutuante do autocomplete (preenchida pelo JS) -->
+        <div id="autocomplete" class="autocomplete hidden"></div>
+      </div>
+
+      <!-- Seleção de lane -->
+      <select id="lane-select" class="lane-select">
+        <option value="">Todas</option>
+        <option value="top">Top</option>
+        <option value="jungle">Jungle</option>
+        <option value="mid">Mid</option>
+        <option value="bot">Bot</option>
+        <option value="support">Support</option>
+      </select>
+
+      <!-- Botão de busca -->
+      <button id="search-btn" class="search-btn">Buscar Build</button>
+    </section>
+
+    <!-- Estado de carregamento -->
+    <div id="loading" class="loading hidden">Buscando build...</div>
+
+    <!-- Estado de erro -->
+    <div id="error" class="error hidden"></div>
+
+    <!-- Área de resultado (preenchida pelo JS) -->
+    <div id="result" class="result"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
