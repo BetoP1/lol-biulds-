@@ -225,3 +225,280 @@ function renderBuild(data) {
       </div>
     </div>`;
 }
+
+// ===========================================================================
+// 5) Test your LOLcky — aba de sorteio de destino
+// ===========================================================================
+
+// ---- Estado da aba ----
+let luckyMode = 'chaos';
+let rerollsLeft = 2;
+let lastLuckyResult = null;
+let rouletteInterval = null;
+
+// ---- Referências do DOM ----
+const rouletteStrip = document.getElementById('roulette-strip');
+const rouletteSlots = rouletteStrip ? Array.from(rouletteStrip.querySelectorAll('.roulette-slot')) : [];
+const btnLucky = document.getElementById('btn-lucky');
+const btnReroll = document.getElementById('btn-reroll');
+const rerollCountEl = document.getElementById('reroll-count');
+const luckyLoading = document.getElementById('lucky-loading');
+const luckyResult = document.getElementById('lucky-result');
+const btnShare = document.getElementById('btn-share');
+
+// ---------------------------------------------------------------------------
+// Navegação entre abas
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const target = btn.dataset.tab;
+    // Alterna a classe ativa dos botões
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    // Mostra apenas a seção correspondente
+    document.querySelectorAll('.tab-content').forEach((sec) => {
+      sec.classList.toggle('hidden', sec.id !== target);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seletor de modo (toggle entre Caos e Meta)
+// ---------------------------------------------------------------------------
+document.querySelectorAll('.mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    luckyMode = btn.dataset.mode;
+    document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b === btn));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Roleta de campeões
+// ---------------------------------------------------------------------------
+
+// Pega um campeão aleatório da lista carregada (champions, do autocomplete)
+function randomChampion() {
+  return champions[Math.floor(Math.random() * champions.length)];
+}
+
+// Começa a animação: a cada 80ms sorteia 7 campeões e injeta os ícones
+function startRoulette() {
+  if (!rouletteSlots.length || !champions.length) return;
+  clearInterval(rouletteInterval);
+  rouletteSlots.forEach((slot) => slot.classList.remove('active', 'dim'));
+
+  const spin = () => {
+    rouletteSlots.forEach((slot) => {
+      const c = randomChampion();
+      slot.innerHTML = `<img src="${c.icon}" alt="${c.name}" />`;
+      slot.classList.add('flash');
+    });
+  };
+  spin();
+  rouletteInterval = setInterval(spin, 80);
+}
+
+// Para a animação desacelerando e fixa o campeão sorteado no slot central (index 3)
+function stopRoulette(finalChampion) {
+  clearInterval(rouletteInterval);
+
+  // Fase de desaceleração: ~500ms girando mais devagar (200ms por giro)
+  let slow = 0;
+  const slowInterval = setInterval(() => {
+    rouletteSlots.forEach((slot) => {
+      const c = randomChampion();
+      slot.innerHTML = `<img src="${c.icon}" alt="${c.name}" />`;
+    });
+    slow++;
+    if (slow >= 2) {
+      clearInterval(slowInterval);
+      // Fixa o resultado no slot central e escurece os demais
+      rouletteSlots.forEach((slot, i) => {
+        slot.classList.remove('flash', 'active', 'dim');
+        if (i === 3) {
+          slot.innerHTML = `<img src="${finalChampion.icon}" alt="${finalChampion.name}" />`;
+          slot.classList.add('active');
+        } else {
+          const c = randomChampion();
+          slot.innerHTML = `<img src="${c.icon}" alt="${c.name}" />`;
+          slot.classList.add('dim');
+        }
+      });
+    }
+  }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Busca do sorteio
+// ---------------------------------------------------------------------------
+async function fetchLucky() {
+  luckyLoading.classList.remove('hidden');
+  luckyResult.classList.add('hidden');
+  btnShare.classList.add('hidden');
+
+  startRoulette();
+
+  try {
+    const res = await fetch(`/api/lucky?mode=${luckyMode}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Falha no sorteio.');
+
+    // Normaliza nome/ícone do campeão (meta devolve string + championIcon; caos devolve objeto)
+    const champ =
+      typeof data.champion === 'object'
+        ? data.champion
+        : { name: data.champion, icon: data.championIcon };
+
+    stopRoulette(champ);
+    setTimeout(() => {
+      luckyLoading.classList.add('hidden');
+      renderLuckyResult(data);
+    }, 800);
+  } catch (err) {
+    console.error('Erro no sorteio:', err);
+    clearInterval(rouletteInterval);
+    luckyLoading.classList.add('hidden');
+    luckyResult.classList.remove('hidden');
+    luckyResult.innerHTML = `<div class="error">${err.message || 'Erro ao sortear. Tente novamente.'}</div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rerolls
+// ---------------------------------------------------------------------------
+function updateRerollBadge() {
+  rerollCountEl.textContent = `🔄 Rerolls: ${rerollsLeft}`;
+  if (rerollsLeft <= 0) {
+    btnReroll.disabled = true;
+    btnReroll.textContent = '🔄 Sem rerolls';
+  }
+}
+
+if (btnLucky) {
+  btnLucky.addEventListener('click', () => {
+    // Novo sorteio "do zero" reabilita os rerolls
+    rerollsLeft = 2;
+    btnReroll.disabled = false;
+    btnReroll.textContent = 'Usar Reroll';
+    updateRerollBadge();
+    fetchLucky();
+  });
+}
+
+if (btnReroll) {
+  btnReroll.addEventListener('click', () => {
+    if (rerollsLeft <= 0) return;
+    rerollsLeft--;
+    updateRerollBadge();
+    fetchLucky();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Renderização do resultado do sorteio
+// ---------------------------------------------------------------------------
+function renderLuckyResult(data) {
+  lastLuckyResult = data;
+
+  const pct = (v) =>
+    v === null || v === undefined ? '—' : `${Number(v).toFixed(1).replace('.0', '')}%`;
+
+  // Normaliza campeão / splash (difere entre os modos)
+  const isMeta = data.mode === 'meta';
+  const champName = typeof data.champion === 'object' ? data.champion.name : data.champion;
+  const champIcon = typeof data.champion === 'object' ? data.champion.icon : data.championIcon;
+  const splashUrl = typeof data.champion === 'object' ? data.champion.splashUrl : data.splashUrl;
+
+  const modeBadge = isMeta ? '📊 Semi-LOLcky' : '💀 Modo Caos';
+  const modeClass = isMeta ? 'badge-meta' : 'badge-chaos';
+
+  // Grid dos 6 itens
+  const itemsHtml = (data.items || [])
+    .map(
+      (item) => `
+      <div class="item">
+        <img class="item-icon" src="${item.icon}" alt="${item.name}" title="${item.name}"
+             onerror="this.style.display='none'" />
+        <span class="item-name">${item.name}</span>
+      </div>`
+    )
+    .join('');
+
+  // Bota sorteada
+  const bootsHtml = data.boots
+    ? `
+      <h3 class="section-title">Botas</h3>
+      <div class="items-grid">
+        <div class="item">
+          <img class="item-icon" src="${data.boots.icon}" alt="${data.boots.name}" title="${data.boots.name}"
+               onerror="this.style.display='none'" />
+          <span class="item-name">${data.boots.name}</span>
+        </div>
+      </div>`
+    : '';
+
+  // Stats extra só no modo meta
+  const metaStats = isMeta
+    ? `
+      <span class="badge wr">Win ${pct(data.winRate)}</span>
+      ${data.tier ? `<span class="badge tier">Tier ${data.tier}</span>` : ''}`
+    : '';
+
+  luckyResult.innerHTML = `
+    <div class="result-card">
+      <div class="result-hero" style="background-image: url('${splashUrl}')">
+        <div class="hero-content">
+          <img class="champ-icon" src="${champIcon}" alt="${champName}"
+               onerror="this.style.display='none'" />
+          <div>
+            <div class="champ-name">${champName}</div>
+            <div class="stats">
+              <span class="badge ${modeClass}">${modeBadge}</span>
+              <span class="badge lane">${data.lane}</span>
+              ${metaStats}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="result-body">
+        <h3 class="section-title">Itens</h3>
+        <div class="items-grid">${itemsHtml || '<span class="runes-raw">Nenhum item sorteado.</span>'}</div>
+        ${bootsHtml}
+      </div>
+    </div>`;
+
+  luckyResult.classList.remove('hidden');
+  btnShare.classList.remove('hidden');
+}
+
+// ---------------------------------------------------------------------------
+// Compartilhar o desafio
+// ---------------------------------------------------------------------------
+if (btnShare) {
+  btnShare.addEventListener('click', async () => {
+    if (!lastLuckyResult) return;
+    const d = lastLuckyResult;
+    const champName = typeof d.champion === 'object' ? d.champion.name : d.champion;
+    const buildStr = (d.items || []).map((i) => i.name).join(' → ');
+    const bootsStr = d.boots ? d.boots.name : '—';
+
+    const text =
+      `🎲 Test your LOLcky!\n` +
+      `🏆 Campeão: ${champName} · Rota: ${d.lane}\n` +
+      `⚔️ Build: ${buildStr}\n` +
+      `👟 Botas: ${bootsStr}\n\n` +
+      `Sorteado pelo LoL Build Finder 🎲`;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      const original = btnShare.textContent;
+      btnShare.textContent = '✅ Copiado!';
+      setTimeout(() => {
+        btnShare.textContent = original;
+      }, 2000);
+    } catch (err) {
+      console.error('Erro ao copiar:', err);
+    }
+  });
+}

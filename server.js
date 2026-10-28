@@ -197,16 +197,25 @@ app.get('/api/champions', async (req, res) => {
   }
 });
 
+// Embaralhamento in-place (Fisher-Yates) — usado pelo Modo Caos do /api/lucky
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
 // ---------------------------------------------------------------------------
-// GET /api/build — build META de um campeão
-// Query params: champion (obrigatório), lane (opcional)
+// computeBuild — núcleo da build META de um campeão.
+// Devolve { status, body }, onde status é o HTTP status e body é o JSON.
+// É usado tanto por /api/build quanto por /api/lucky (modo "meta").
 // ---------------------------------------------------------------------------
-app.get('/api/build', async (req, res) => {
-  const rawChampion = req.query.champion;
-  const lane = req.query.lane || 'default'; // Lolalytics usa "default" quando não há lane específica
+async function computeBuild(rawChampion, laneInput) {
+  const lane = laneInput || 'default'; // Lolalytics usa "default" quando não há lane específica
 
   if (!rawChampion) {
-    return res.status(400).json({ error: 'Parâmetro "champion" é obrigatório.' });
+    return { status: 400, body: { error: 'Parâmetro "champion" é obrigatório.' } };
   }
 
   const champion = normalizeChampionName(rawChampion);
@@ -248,11 +257,14 @@ app.get('/api/build', async (req, res) => {
     } catch (lolErr) {
       // Logamos o objeto/erro para análise, como pedido, e devolvemos erro claro.
       console.error('Erro ao consultar o Lolalytics:', lolErr.message);
-      return res.status(502).json({
-        error:
-          'Falha ao obter dados do Lolalytics. O serviço pode estar indisponível ou o campeão/lane informado não existe.',
-        detail: lolErr.message,
-      });
+      return {
+        status: 502,
+        body: {
+          error:
+            'Falha ao obter dados do Lolalytics. O serviço pode estar indisponível ou o campeão/lane informado não existe.',
+          detail: lolErr.message,
+        },
+      };
     }
 
     // Carrega os mapas de tradução (nomes de itens, ids de campeão, runas, botas)
@@ -342,11 +354,14 @@ app.get('/api/build', async (req, res) => {
 
     // Se não veio nada de útil, provavelmente o campeão (ou a lane) não existe.
     if (!items.length && winRate == null && !runes) {
-      return res.status(404).json({
-        error: `Sem dados para "${rawChampion}"${
-          lolLane ? ` na lane ${lane}` : ''
-        }. Verifique o nome do campeão (e a lane).`,
-      });
+      return {
+        status: 404,
+        body: {
+          error: `Sem dados para "${rawChampion}"${
+            lolLane ? ` na lane ${lane}` : ''
+          }. Verifique o nome do campeão (e a lane).`,
+        },
+      };
     }
 
     // ------------------------------------------------------------------
@@ -359,24 +374,121 @@ app.get('/api/build', async (req, res) => {
     // ------------------------------------------------------------------
     // 6) Monta e devolve o JSON final
     // ------------------------------------------------------------------
-    res.json({
-      champion: championName,
-      championId,
-      lane: resolvedLane,
-      patch: version,
-      items,
-      boots,
-      runes,
-      winRate,
-      pickRate,
-      banRate,
-      tier: null, // o endpoint mega não expõe o "tier" (S/A/B); não inventamos o valor
-      championIcon: `${DDRAGON}/cdn/${version}/img/champion/${championId}.png`,
-      splashUrl: `${DDRAGON}/cdn/img/champion/splash/${championId}_0.jpg`,
+    return {
+      status: 200,
+      body: {
+        champion: championName,
+        championId,
+        lane: resolvedLane,
+        patch: version,
+        items,
+        boots,
+        runes,
+        winRate,
+        pickRate,
+        banRate,
+        tier: null, // o endpoint mega não expõe o "tier" (S/A/B); não inventamos o valor
+        championIcon: `${DDRAGON}/cdn/${version}/img/champion/${championId}.png`,
+        splashUrl: `${DDRAGON}/cdn/img/champion/splash/${championId}_0.jpg`,
+      },
+    };
+  } catch (err) {
+    console.error('Erro inesperado em computeBuild:', err.message);
+    return { status: 500, body: { error: 'Erro interno ao montar a build.', detail: err.message } };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/build — build META de um campeão
+// Query params: champion (obrigatório), lane (opcional)
+// ---------------------------------------------------------------------------
+app.get('/api/build', async (req, res) => {
+  const { status, body } = await computeBuild(req.query.champion, req.query.lane);
+  res.status(status).json(body);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/lucky — "Test your LOLcky": sorteia campeão + rota e devolve uma build
+// Query params: mode = "chaos" (itens aleatórios) | "meta" (build real do Lolalytics)
+// ---------------------------------------------------------------------------
+app.get('/api/lucky', async (req, res) => {
+  const mode = req.query.mode === 'meta' ? 'meta' : 'chaos';
+
+  try {
+    const version = await getLatestVersion();
+
+    // Sorteia um campeão aleatório a partir do champion.json do Data Dragon
+    const { data: champData } = await axios.get(
+      `${DDRAGON}/cdn/${version}/data/pt_BR/champion.json`
+    );
+    const allChamps = Object.values(champData.data);
+    const champ = allChamps[Math.floor(Math.random() * allChamps.length)];
+
+    // Sorteia uma rota aleatória
+    const lanes = ['top', 'jungle', 'mid', 'bot', 'support'];
+    const lane = lanes[Math.floor(Math.random() * lanes.length)];
+
+    // ------------------------------------------------------------------
+    // Modo META: reutiliza a lógica de /api/build com o campeão/rota sorteados
+    // ------------------------------------------------------------------
+    if (mode === 'meta') {
+      const { status, body } = await computeBuild(champ.id, lane);
+      if (status !== 200) {
+        // Sem dados META para essa combinação (campeão/rota improvável) — devolvemos o erro.
+        return res.status(status).json({ ...body, champion: champ.name, lane, mode: 'meta' });
+      }
+      return res.json({ ...body, champion: champ.name, lane, mode: 'meta' });
+    }
+
+    // ------------------------------------------------------------------
+    // Modo CAOS: itens aleatórios compráveis da loja (mapa Summoner's Rift)
+    // ------------------------------------------------------------------
+    const { data: itemData } = await axios.get(
+      `${DDRAGON}/cdn/${version}/data/pt_BR/item.json`
+    );
+
+    // Filtra apenas itens realmente compráveis na loja da Summoner's Rift (mapa "11")
+    const buyable = [];
+    for (const [id, info] of Object.entries(itemData.data)) {
+      const gold = info.gold || {};
+      if (gold.purchasable !== true) continue;
+      if (!(gold.total > 0)) continue;
+      if (!(info.maps && info.maps['11'] === true)) continue;
+      buyable.push({ id, info });
+    }
+
+    // Separa as botas (tag "Boots") dos demais itens
+    const boots = buyable.filter((it) => it.info.tags && it.info.tags.includes('Boots'));
+    const normals = buyable.filter((it) => !(it.info.tags && it.info.tags.includes('Boots')));
+
+    // Monta {id, name, icon} a partir de uma entrada da lista acima
+    const toItem = ({ id, info }) => ({
+      id,
+      name: info.name,
+      icon: `${DDRAGON}/cdn/${version}/img/item/${id}.png`,
+    });
+
+    // Embaralha os itens normais e pega os 6 primeiros; sorteia 1 bota
+    const chosenItems = shuffle(normals.slice()).slice(0, 6).map(toItem);
+    const chosenBoots = boots.length
+      ? toItem(boots[Math.floor(Math.random() * boots.length)])
+      : null;
+
+    return res.json({
+      champion: {
+        id: champ.id,
+        name: champ.name,
+        icon: `${DDRAGON}/cdn/${version}/img/champion/${champ.id}.png`,
+        splashUrl: `${DDRAGON}/cdn/img/champion/splash/${champ.id}_0.jpg`,
+      },
+      lane,
+      items: chosenItems,
+      boots: chosenBoots,
+      mode: 'chaos',
     });
   } catch (err) {
-    console.error('Erro inesperado em /api/build:', err.message);
-    res.status(500).json({ error: 'Erro interno ao montar a build.', detail: err.message });
+    console.error('Erro em /api/lucky:', err.message);
+    res.status(502).json({ error: 'Não foi possível sortear seu destino. Tente novamente.', detail: err.message });
   }
 });
 

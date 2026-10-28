@@ -19,6 +19,14 @@
 
   <!-- Área de busca -->
   <main class="container">
+    <!-- Navegação por abas -->
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="tab-search">🔎 Buscar Build</button>
+      <button class="tab-btn" data-tab="tab-lucky">🎲 Test your LOLcky</button>
+    </nav>
+
+    <!-- ===================== ABA: BUSCAR BUILD ===================== -->
+    <section id="tab-search" class="tab-content">
     <section class="search">
       <!-- Wrapper do input + autocomplete (posição relativa para posicionar as sugestões) -->
       <div class="search-input-wrap">
@@ -55,6 +63,50 @@
 
     <!-- Área de resultado (preenchida pelo JS) -->
     <div id="result" class="result"></div>
+    </section>
+
+    <!-- ===================== ABA: TEST YOUR LOLCKY ===================== -->
+    <section id="tab-lucky" class="tab-content hidden">
+      <div class="lucky-head">
+        <h2 class="lucky-title">Test your LOLcky 🎲</h2>
+        <p class="lucky-sub">Sorteie seu destino. Sem desculpas.</p>
+      </div>
+
+      <!-- Seletor de modo (botões toggle) -->
+      <div class="mode-select">
+        <button class="mode-btn mode-chaos active" data-mode="chaos">💀 Modo Caos</button>
+        <button class="mode-btn mode-meta" data-mode="meta">📊 Modo Semi-LOLcky</button>
+      </div>
+
+      <!-- Roleta de campeões -->
+      <div id="roulette-strip" class="roulette-strip">
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+        <div class="roulette-slot"></div>
+      </div>
+
+      <!-- Botão principal -->
+      <button id="btn-lucky" class="btn-lucky">🎲 Sortear Destino</button>
+
+      <!-- Área de rerolls -->
+      <div class="reroll-area">
+        <span id="reroll-count" class="reroll-badge">🔄 Rerolls: 2</span>
+        <button id="btn-reroll" class="btn-reroll" disabled>Usar Reroll</button>
+      </div>
+
+      <!-- Estado de carregamento -->
+      <div id="lucky-loading" class="loading hidden">Invocando seu destino...</div>
+
+      <!-- Resultado (preenchido pelo JS) -->
+      <div id="lucky-result" class="result hidden"></div>
+
+      <!-- Compartilhar -->
+      <button id="btn-share" class="btn-share hidden">📤 Copiar Desafio</button>
+    </section>
   </main>
 
   <script src="app.js"></script>
